@@ -18,10 +18,11 @@ export default function ConfigurationTab({ service, onServiceUpdated }: Configur
     name: service.name || '',
     cpuLimit: service.cpuLimit || '',
     memoryLimit: service.memoryLimit || '',
-    isStaticReplica: service.isStaticReplica || false,
-    replicas: service.replicas || 1,
-    minReplicas: service.minReplicas || 1,
-    maxReplicas: service.maxReplicas || 3,
+    // FIX: Handle boolean properly - use ?? instead of ||
+    isStaticReplica: service.isStaticReplica ?? false,
+    replicas: service.replicas,
+    minReplicas: service.minReplicas,
+    maxReplicas: service.maxReplicas,
     customDomain: service.customDomain || '',
     // Git service fields (removed buildCommand and startCommand)
     branch: service.branch || '',
@@ -49,6 +50,36 @@ export default function ConfigurationTab({ service, onServiceUpdated }: Configur
     setFormValues(prev => ({ ...prev, [name]: processedValue }));
   };
 
+  // FIX: Custom comparison function for detecting changes
+  const hasFieldChanged = (fieldName: string): boolean => {
+    const formValue = formValues[fieldName as keyof typeof formValues];
+    const serviceValue = service[fieldName as keyof Service];
+    
+    // Special handling for boolean fields
+    if (fieldName === 'isStaticReplica') {
+      // Normalize both values to handle undefined/null cases
+      const normalizedFormValue = Boolean(formValue);
+      const normalizedServiceValue = Boolean(serviceValue);
+      return normalizedFormValue !== normalizedServiceValue;
+    }
+    
+    // Special handling for port (number vs string)
+    if (fieldName === 'port') {
+      const formPort = formValue === '' ? undefined : Number(formValue);
+      return formPort !== serviceValue;
+    }
+    
+    // For empty strings vs undefined/null, treat as same
+    if (formValue === '' && (serviceValue === undefined || serviceValue === null)) {
+      return false;
+    }
+    if ((formValue === undefined || formValue === null) && serviceValue === '') {
+      return false;
+    }
+    
+    return formValue !== serviceValue;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -56,16 +87,16 @@ export default function ConfigurationTab({ service, onServiceUpdated }: Configur
     setSuccess(false);
 
     try {
-      // Get changed fields only
-      const changedFields = Object.keys(formValues).filter(
-        key => formValues[key as keyof typeof formValues] !== service[key as keyof Service]
-      );
+      // FIX: Use custom comparison function
+      const changedFields = Object.keys(formValues).filter(hasFieldChanged);
       
       if (changedFields.length === 0) {
         setError('No changes to save');
         setIsLoading(false);
         return;
       }
+
+      console.log('Changed fields:', changedFields); // Debug log
 
       // Create update DTO with changed fields only
       // Convert form values to appropriate types for Service object
@@ -80,6 +111,8 @@ export default function ConfigurationTab({ service, onServiceUpdated }: Configur
         serviceData,
         changedFields
       );
+      
+      console.log('Service update payload:', serviceUpdate); // Debug log
       
       await updateService(service.id, serviceUpdate);
       setSuccess(true);

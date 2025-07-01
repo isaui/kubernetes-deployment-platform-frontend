@@ -87,12 +87,12 @@ export default function Hero() {
             Deploy, scale, and manage both Git repositories and managed services with ease
           </p>
           <div className="mt-10 flex items-center gap-x-6">
-            <Link
-              to="/projects"
+            <a
+              href="/projects"
               className="rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Get Started
-            </Link>
+            </a>
             <a href="#features" className="text-sm font-semibold leading-6 text-gray-900 dark:text-gray-300">
               Learn more <span aria-hidden="true">→</span>
             </a>
