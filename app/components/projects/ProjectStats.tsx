@@ -322,7 +322,6 @@ export default function ProjectStats({ stats, onEditEnvironment, onDeleteSuccess
                     <td className="px-6 py-4">
                       {service.isAutoScaling ? (
                         <div className="flex items-center space-x-2">
-                          <span className="text-sm text-gray-900 dark:text-white">{service.replicas}</span>
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-xs font-medium text-blue-800 dark:text-blue-300">
                             Auto
                           </span>
