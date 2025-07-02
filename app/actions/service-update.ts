@@ -88,6 +88,8 @@ export function createPartialUpdate(
       }
     });
   }
+  console.log(hasChanges)
+  console.log('Partial update:', changes);
   
   return hasChanges ? changes as ServiceUpdate : null;
 }
@@ -99,6 +101,7 @@ export function createPartialUpdate(
  * @returns True if valid, throws error if invalid
  */
 export function validateServiceUpdatePayload(update: ServiceUpdate): boolean {
+  
   // Check required type field
   if (!update.type || !['git', 'managed'].includes(update.type)) {
     throw new Error('Service type is required and must be either "git" or "managed"');

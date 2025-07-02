@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 export default function Hero() {
   const carouselImages = [
     { src: "/project-page.png", alt: "Project management page" },
+    { src: "/project-page-2.png", alt: "Project management page" },
     { src: "/service-page.png", alt: "Service details page" },
   ];
   

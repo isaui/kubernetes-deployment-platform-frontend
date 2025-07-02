@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/node';
 import { Form, useLoaderData, useActionData, useNavigation, Link } from '@remix-run/react';
 import { createService } from '~/actions/service.server';
@@ -78,6 +78,31 @@ export async function action({ request, params }: ActionFunctionArgs) {
       if (!serviceData.name || !serviceData.environmentId || !serviceData.managedType) {
         return json({ error: 'Please fill in all required fields for Managed service' }, { status: 400 });
       }
+      
+      // Validate storage size
+      if (serviceData.storageSize) {
+        // Extract numeric value and unit from storageSize (e.g., "5Gi" -> 5, "Gi")
+        const sizeMatch = serviceData.storageSize.match(/^([0-9]+)([A-Za-z]+)$/);
+        if (!sizeMatch) {
+          return json({ error: 'Invalid storage size format. Please use format like "1Gi" or "500Mi"' }, { status: 400 });
+        }
+        
+        const value = parseInt(sizeMatch[1], 10);
+        const unit = sizeMatch[2];
+        
+        // Convert to Gi for validation if in Mi
+        let sizeInGi = value;
+        if (unit.toLowerCase() === 'mi') {
+          sizeInGi = value / 1024;
+        } else if (unit.toLowerCase() !== 'gi') {
+          return json({ error: 'Storage size must use Gi or Mi units' }, { status: 400 });
+        }
+        
+        // Check if exceeds 8Gi limit
+        if (sizeInGi > 8) {
+          return json({ error: 'Storage size cannot exceed 8Gi' }, { status: 400 });
+        }
+      }
     } else {
       return json({ error: 'Invalid service type' }, { status: 400 });
     }
@@ -102,6 +127,8 @@ export default function CreateService() {
   const [serviceType, setServiceType] = useState<ServiceType>('git');
   const [managedType, setManagedType] = useState<ManagedServiceType | ''>('');
   const [defaultVersion, setDefaultVersion] = useState<string>('latest');
+  const [storageSizeError, setStorageSizeError] = useState<string>('');
+  const storageSizeRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-200 via-white to-indigo-300 dark:from-indigo-950 dark:via-gray-900 dark:to-violet-900 relative overflow-hidden">
@@ -417,13 +444,49 @@ export default function CreateService() {
                           name="storageSize"
                           id="storageSize"
                           defaultValue="1Gi"
+                          ref={storageSizeRef}
                           disabled={isSubmitting}
-                          className="w-full px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all backdrop-blur-sm disabled:opacity-50"
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Validate format (numbers followed by Gi or Mi)
+                            const sizeMatch = value.match(/^([0-9]+)([A-Za-z]+)$/); 
+                            if (!sizeMatch) {
+                              setStorageSizeError('Invalid format. Use 1Gi, 500Mi, etc.');
+                              return;
+                            }
+                            
+                            const numValue = parseInt(sizeMatch[1], 10);
+                            const unit = sizeMatch[2].toLowerCase();
+                            
+                            // Check units
+                            if (unit !== 'gi' && unit !== 'mi') {
+                              setStorageSizeError('Only Gi or Mi units are allowed');
+                              return;
+                            }
+                            
+                            // Calculate size in Gi
+                            let sizeInGi = numValue;
+                            if (unit === 'mi') {
+                              sizeInGi = numValue / 1024;
+                            }
+                            
+                            // Check maximum
+                            if (sizeInGi > 8) {
+                              setStorageSizeError('Storage size cannot exceed 8Gi');
+                            } else {
+                              setStorageSizeError('');
+                            }
+                          }}
+                          className={`w-full px-4 py-3 bg-gray-50/50 dark:bg-gray-900/50 border ${storageSizeError ? 'border-red-500' : 'border-gray-200 dark:border-gray-700'} rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20 transition-all backdrop-blur-sm disabled:opacity-50`}
                           placeholder="1Gi"
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          Format: 1Gi, 500Mi, etc.
-                        </p>
+                        {storageSizeError ? (
+                          <p className="text-xs text-red-500 mt-1">{storageSizeError}</p>
+                        ) : (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Format: 1Gi, 500Mi, etc. Maximum: 8Gi
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -440,7 +503,7 @@ export default function CreateService() {
                   
                   <button
                     type="submit"
-                    disabled={isSubmitting || environments?.length === 0}
+                    disabled={isSubmitting || environments?.length === 0 || (serviceType === 'managed' && !!storageSizeError)}
                     className="flex-1 sm:flex-none px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transform hover:scale-105 disabled:hover:scale-100"
                   >
                     {isSubmitting ? (
