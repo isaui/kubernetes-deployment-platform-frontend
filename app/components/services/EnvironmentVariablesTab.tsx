@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Plus, AlertCircle, Database, Save, Info } from 'lucide-react';
+import { Plus, AlertCircle, Database, Save, Info, Code } from 'lucide-react';
 import { useNavigate } from '@remix-run/react';
 import EnvironmentVariableItem from './EnvironmentVariableItem';
 import EnvironmentVariableForm from './EnvironmentVariableForm';
+import RawEditor from './RawEditor';
 import type { Service } from '~/types/service';
-import { getServiceEnvVars } from '~/actions/service-env';
 import { updateService } from '~/actions/service-update';
 import { createServiceUpdate } from '~/types/service-update';
 
@@ -28,6 +28,7 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showRawEditor, setShowRawEditor] = useState(false);
   const [editingVariable, setEditingVariable] = useState<EnvironmentVariable | null>(null);
   
   // Track if we've made changes that need to be saved
@@ -79,6 +80,7 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
       setError(null);
       setIsDirty(false);
       setShowForm(false);
+      setShowRawEditor(false);
       
       // We don't need to manually update local state anymore as the component
       // will be rehydrated with fresh data from the server
@@ -146,6 +148,24 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
     setIsDirty(true);
   };
   
+  // Handle raw editor submit
+  const handleRawEditorSubmit = (newVariables: Record<string, string>) => {
+    if (!isEditable) return;
+    
+    // Update local state
+    const newVariablesArray = Object.entries(newVariables).map(
+      ([name, value]) => ({ name, value })
+    );
+    setVariables(newVariablesArray);
+    
+    // Track changes for bulk update
+    setPendingChanges(newVariables);
+    
+    // Mark as dirty to save later
+    setIsDirty(true);
+    setShowRawEditor(false);
+  };
+  
   // Start editing a variable
   const startEditingVariable = (name: string, value: string) => {
     setEditingVariable({ name, value });
@@ -158,10 +178,21 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
     }
   };
 
+  // Toggle between form and raw editor
+  const toggleRawEditor = () => {
+    setShowRawEditor(!showRawEditor);
+    setShowForm(false);
+    setEditingVariable(null);
+  };
+
+  const toggleForm = () => {
+    setShowForm(!showForm);
+    setShowRawEditor(false);
+    setEditingVariable(null);
+  };
+
   return (
     <div className="p-8 space-y-8">
-
-
       {/* Info box for read-only variables */}
       {!isEditable && (
         <div className="bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/30 rounded-xl p-6 backdrop-blur-sm">
@@ -220,6 +251,15 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
         </div>
       )}
 
+      {/* Raw Editor */}
+      {showRawEditor && (
+        <RawEditor
+          initialVariables={pendingChanges}
+          onSubmit={handleRawEditorSubmit}
+          onCancel={() => setShowRawEditor(false)}
+        />
+      )}
+
       {/* Main Content */}
       <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl border border-gray-200/50 dark:border-gray-700/50 shadow-sm overflow-hidden">
         {/* Header with Add Button */}
@@ -232,14 +272,27 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
               </span>
             </div>
             
-            {isEditable && !showForm && !editingVariable && (
-              <button
-                onClick={() => setShowForm(true)}
-                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 transform hover:scale-105"
-              >
-                <Plus size={16} className="mr-2" />
-                Add Variable
-              </button>
+            {isEditable && !showForm && !editingVariable && !showRawEditor && (
+              <div className="flex items-center space-x-2">
+                {/* Raw Editor Toggle */}
+                <button
+                  onClick={toggleRawEditor}
+                  className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-xl transition-all duration-200"
+                  title="Raw Editor - Bulk edit with .env or JSON format"
+                >
+                  <Code size={16} className="mr-2" />
+                  Raw Editor
+                </button>
+                
+                {/* Add Variable Button */}
+                <button
+                  onClick={toggleForm}
+                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all duration-200 transform hover:scale-105"
+                >
+                  <Plus size={16} className="mr-2" />
+                  Add Variable
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -276,9 +329,28 @@ export default function EnvironmentVariablesTab({ service }: EnvironmentVariable
                 <Database className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No Variables Defined</h3>
-              <p className="text-gray-500 dark:text-gray-400">
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
                 {isEditable ? 'Get started by adding your first environment variable.' : 'This service has no environment variables configured.'}
               </p>
+              {isEditable && (
+                <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
+                  <button
+                    onClick={toggleForm}
+                    className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+                  >
+                    <Plus size={16} className="mr-2" />
+                    Add Variable
+                  </button>
+                  <span className="text-gray-400">or</span>
+                  <button
+                    onClick={toggleRawEditor}
+                    className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors"
+                  >
+                    <Code size={16} className="mr-2" />
+                    Use Raw Editor
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-1">
